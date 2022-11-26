@@ -2,7 +2,7 @@ import net from 'net';
 import child_process from 'child_process';
 import stream from 'stream';
 import EventEmitter from 'events';
-export class SocketClient extends EventEmitter{
+export class SocketServer extends EventEmitter{
     private pythonProcess;
     private server = net.createServer();
     private socket?: net.Socket;
@@ -18,18 +18,26 @@ export class SocketClient extends EventEmitter{
             this.emit('connected');
         });
     }
-    pipeline(request: string){
+
+    on(eventName: 'connected', listener: ()=>void): this;
+    on(event: string, listener: (...args: any[]) => void): this;
+    on(event: string, listener: (...args: any[]) => void){
+        return super.on(event, listener);
+    }
+
+    pipeline(handler: string, request: string){
         return new Promise<string>((resolve,reject)=>{
             if(!this.socket){
                 reject(`Client is still pending.`);
             }else{
                 try{
                     let id = Math.random().toString();
-                    this.socket.write(id+'\n'+request);
-                    this.socket.on('data', (data)=>{
-                        let [idRecv, response] = data.toString().split('\n');
+                    this.socket.write([id, handler, request].join('\n'));
+                    this.socket.once('data', (data)=>{
+                        let [idRecv, status, response] = data.toString().split('\n');
                         if(idRecv == id){
-                            resolve(response);
+                            if(status == '0')resolve(response);
+                            else if(status == '1')reject(response);
                         }
                     });
                 }catch(e){
